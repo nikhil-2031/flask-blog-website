@@ -1,4 +1,5 @@
 from datetime import date
+import os
 from flask import Flask, abort, render_template, redirect, url_for, flash, request
 from flask_bootstrap import Bootstrap5
 from flask_ckeditor import CKEditor
@@ -13,7 +14,7 @@ import smtplib
 
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = '8BYkEfBA6O6donzWlSihBXox7C0sKR6b'
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 ckeditor = CKEditor(app)
 Bootstrap5(app)
 
@@ -38,7 +39,7 @@ gravatar = Gravatar(app,
                     base_url=None)
 
 # CONNECT TO DB
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///posts.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DB_URI', 'sqlite:///posts.db')
 db = SQLAlchemy()
 db.init_app(app)
 
@@ -252,10 +253,29 @@ def about():
     return render_template("about.html", current_user=current_user)
 
 
-@app.route("/contact", methods=["GET", "POST"])
-def contact():
+CONTACT_EMAIL = os.getenv('CONTACT_EMAIL')
+CONTACT_EMAIL_PWD = os.getenv('CONTACT_EMAIL_PWD')
+APP_EMAIL = os.getenv('APP_EMAIL')
 
-    return render_template("contact.html", current_user=current_user)
+
+@app.route('/contact', methods=["GET", "POST"])
+def contact():
+    if request.method == "POST":
+        message = f"Name: {request.form['name']}\n" \
+                  f"E-Mail: {request.form['email']}\n" \
+                  f"Phone: {request.form['phone']}\n" \
+                  f"Message: {request.form['message']}"
+        with smtplib.SMTP("smtp.gmail.com") as connection:
+            connection.starttls()
+            connection.login(user=CONTACT_EMAIL, password=CONTACT_EMAIL_PWD)
+            connection.sendmail(
+                from_addr=CONTACT_EMAIL,
+                to_addrs=APP_EMAIL,
+                msg=f"Subject:Contact form submission\n\n{message}"
+            )
+        return render_template('contact.html', msg_sent=True)
+    else:
+        return render_template("contact.html", msg_sent=False)
 
 
 if __name__ == "__main__":
